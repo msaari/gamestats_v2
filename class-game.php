@@ -60,5 +60,13 @@ class Game {
         
         $this->happiness = round(log10($happiness), 2);
         $this->hotness = round(log10($hotness), 2);
+
+        if (is_nan($this->happiness)) {
+            $this->happiness = 0;
+        }
+
+        if (is_nan($this->hotness)) {
+            $this->hotness = 0;
+        }
     }
 }

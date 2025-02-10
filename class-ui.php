@@ -288,30 +288,9 @@ class UI {
 
 <div class="spacer"></div>
 
-<form method="get">
-    <label for="from">Tästä:
-        <input type="date" name="from" value="<?php echo $from; ?>">
-    </label>
-
-    <label for="to">Tähän:
-        <input type="date" name="to" value="<?php echo $to; ?>">
-    </label>
-
-    <?php if (isset($_REQUEST['orderby'])) : ?>
-        <input type="hidden" name="orderby" value="<?php echo $_REQUEST['orderby']; ?>">
-    <?php endif; ?>
-    <input type="hidden" name="tab" value="plays">
-    <button type="submit" class="c-button c-button--brand">Päivitä</button>
-</form>
-<form method="get">
-    <?php if (isset($_REQUEST['orderby'])) : ?>
-        <input type="hidden" name="orderby" value="<?php echo $_REQUEST['orderby']; ?>">
-    <?php endif; ?>
-    <input type="hidden" name="tab" value="plays">
-    <button type="submit" name="12months" value="1" class="c-button c-button--brand">12 kk</button>
-    <button type="submit" name="lastyear" value="1" class="c-button c-button--brand">Viime vuosi</button>
-    <button type="submit" name="thisyear" value="1" class="c-button c-button--brand">Tämä vuosi</button>
-</form>
+        <?php
+        $this->dateRangeButtons($from, $to, 'plays');
+        ?>
 
 <div class="spacer"></div>
 
@@ -399,10 +378,10 @@ list($lowestYear, $lowestMonth) = explode('-', $firstMonth);
 list($highestYear, $highestMonth) = explode('-', $lastMonth);
 for ($i = $lowestYear; $i <= $highestYear; $i++) {
     for ($j = 1; $j <= 12; $j++) {
-        if ($i === $lowestYear && $j < $lowestMonth) {
+        if ($i === (int) $lowestYear && $j < (int) $lowestMonth) {
             continue;
         }
-        if ($i === $highestYear && $j > $highestMonth) {
+        if ($i === (int) $highestYear && $j > (int) $highestMonth) {
             continue;
         }
         $month = $j;
@@ -574,30 +553,9 @@ new Chart(ctx_y, {
 
 <div class="spacer"></div>
 
-<form method="get">
-    <label for="from">Tästä:
-        <input type="date" name="from" value="<?php echo $from; ?>">
-    </label>
-
-    <label for="to">Tähän:
-        <input type="date" name="to" value="<?php echo $to; ?>">
-    </label>
-
-    <?php if (isset($_REQUEST['orderby'])) : ?>
-        <input type="hidden" name="orderby" value="<?php echo $_REQUEST['orderby']; ?>">
-    <?php endif; ?>
-    <input type="hidden" name="tab" value="games">
-    <button type="submit" class="c-button c-button--brand">Päivitä</button>
-</form>
-<form method="get">
-    <?php if (isset($_REQUEST['orderby'])) : ?>
-        <input type="hidden" name="orderby" value="<?php echo $_REQUEST['orderby']; ?>">
-    <?php endif; ?>
-    <input type="hidden" name="tab" value="games">
-    <button type="submit" name="12months" value="1" class="c-button c-button--brand">12 kk</button>
-    <button type="submit" name="lastyear" value="1" class="c-button c-button--brand">Viime vuosi</button>
-    <button type="submit" name="thisyear" value="1" class="c-button c-button--brand">Tämä vuosi</button>
-</form>
+        <?php
+        $this->dateRangeButtons($from, $to, 'games');
+        ?>
 
 <div class="spacer"></div>
 
@@ -679,7 +637,7 @@ new Chart(ctx_y, {
     }
 
     private function getURLString($args) {
-        $pickupArgs = ['tab', '12months', 'lastyear', 'thisyear', 'from', 'to'];
+        $pickupArgs = ['tab', '12months', 'everything', 'lastyear', 'thisyear', 'from', 'to'];
         foreach ($pickupArgs as $arg) {
             if (isset($_REQUEST[ $arg ])) {
                 $args[ $arg ] = $_REQUEST[ $arg ];
@@ -691,6 +649,11 @@ new Chart(ctx_y, {
     private function getDateRange() {
         $from = isset($_REQUEST['from']) ? $_REQUEST['from'] : date('Y-m-d', strtotime('first day of january this year'));
         $to = isset($_REQUEST['to']) ? $_REQUEST['to'] : date('Y-m-d');
+
+        if (isset($_REQUEST['everything'])) {
+            $from = '1970-01-01';
+            $to = date("Y-m-d");
+        }
 
         if (isset($_REQUEST['12months'])) {
             $from = date("Y-m-d", strtotime("12 months ago"));
@@ -707,5 +670,35 @@ new Chart(ctx_y, {
             $to = date("Y-m-d", strtotime("last day of december this year"));
         }
         return ['from' => $from, 'to' => $to];
+    }
+
+    private function dateRangeButtons($from, $to, $tab) {
+        ?>
+<form method="get">
+    <label for="from">Tästä:
+        <input type="date" name="from" value="<?php echo $from; ?>">
+    </label>
+
+    <label for="to">Tähän:
+        <input type="date" name="to" value="<?php echo $to; ?>">
+    </label>
+
+    <?php if (isset($_REQUEST['orderby'])) : ?>
+        <input type="hidden" name="orderby" value="<?php echo $_REQUEST['orderby']; ?>">
+    <?php endif; ?>
+    <input type="hidden" name="tab" value="<?php echo $tab; ?>">
+    <button type="submit" class="c-button c-button--brand">Päivitä</button>
+</form>
+<form method="get">
+    <?php if (isset($_REQUEST['orderby'])) : ?>
+        <input type="hidden" name="orderby" value="<?php echo $_REQUEST['orderby']; ?>">
+    <?php endif; ?>
+    <input type="hidden" name="tab" value="<?php echo $tab; ?>">
+    <button type="submit" name="everything" value="1" class="c-button c-button--<?php echo isset($_REQUEST['everything']) ? 'info' : 'brand'; ?>">Kaikki</button>
+    <button type="submit" name="12months" value="1" class="c-button c-button--<?php echo isset($_REQUEST['12months']) ? 'info' : 'brand'; ?>">12 kk</button>
+    <button type="submit" name="lastyear" value="1" class="c-button c-button--<?php echo isset($_REQUEST['lastyear']) ? 'info' : 'brand'; ?>">Viime vuosi</button>
+    <button type="submit" name="thisyear" value="1" class="c-button c-button--<?php echo isset($_REQUEST['thisyear']) ? 'info' : 'brand'; ?>">Tämä vuosi</button>
+</form>
+    <?php
     }
 }

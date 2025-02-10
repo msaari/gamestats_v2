@@ -306,6 +306,8 @@ class Database {
             WHERE plays.game = games.id';
         $bind = array();
         if (isset($args['game']) && !empty($args['game'])) {
+            unset($args['from']);
+            unset($args['to']);
             if (!is_numeric($args['game'])) {
                 $gameObj = $this->getGameByName($args['game']);
                 $game = $gameObj['id'];
