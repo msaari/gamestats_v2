@@ -49,17 +49,13 @@ class Database {
         $this->db->exec("CREATE TABLE IF NOT EXISTS game_entities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             game_id INTEGER NOT NULL,
-            entity_id INTEGER NOT NULL,
-            FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
-            FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
+            entity_id INTEGER NOT NULL
         )");
 
         $this->db->exec("CREATE TABLE IF NOT EXISTS game_taxonomy (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             game_id INTEGER NOT NULL,
-            tag_id INTEGER NOT NULL,
-            FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
-            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+            tag_id INTEGER NOT NULL
         )");
 
         $this->db->exec("CREATE TABLE IF NOT EXISTS sessions (
@@ -147,7 +143,45 @@ class Database {
         return $row;
     }
 
-    public function insertGame(string $name, int $year, int $bgg, int $rating, int $playtime, string $parent, array $designers, array $publishers, string $tags) {
+    public function saveGame($args) {
+        $designers = explode(',', $args['designers']);
+        $designers = array_map('trim', $designers);
+        
+        $publishers = explode(',', $args['publishers']);
+        $publishers = array_map('trim', $publishers);
+
+        $tags = explode(',', $args['tags']);
+        $tags = array_map('trim', $tags);
+
+        if (isset($args['id'])) {
+            return $this->updateGame(
+                (int) $args['id'],
+                $args['name'],
+                (int) $args['year'],
+                (int) $args['bgg'],
+                (int) $args['rating'],
+                (int) $args['playtime'],
+                $args['parent'],
+                $designers,
+                $publishers,
+                $tags
+            );
+        } else {
+            return $this->insertGame(
+                $args['name'],
+                (int) $args['year'],
+                (int) $args['bgg'],
+                (int) $args['rating'],
+                (int) $args['playtime'],
+                $args['parent'],
+                $designers,
+                $publishers,
+                $tags
+            );
+        }
+    }
+
+    public function insertGame(string $name, int $year, int $bgg, int $rating, int $playtime, string $parent, array $designers, array $publishers, array $tags) {
         if ($parent) {
             $parentGame = $this->getGameByName($parent);
             if ($parentGame) {
@@ -199,7 +233,109 @@ class Database {
             $stmt->bindValue(':entity_id', $entity_id, SQLITE3_INTEGER);
             $stmt->execute();
         }
+
+        foreach ($tags as $tagName) {
+            $tag = $this->getTagByName($tagName);
+            if ($tag) {
+                $tagIDs[] = $tag['id'];
+            } else {
+                $tagIDs[] = $this->insertTag($tagName);
+            }
+        }
+
+        foreach ($tagIDs as $tag_id) {
+            $stmt = $this->db->prepare(
+                "INSERT INTO game_taxonomy (game_id, tag_id)
+                VALUES (:game_id, :tag_id)"
+            );
+            $stmt->bindValue(':game_id', $game_id, SQLITE3_INTEGER);
+            $stmt->bindValue(':tag_id', $tag_id, SQLITE3_INTEGER);
+            $stmt->execute();
+        }
+
         return $game_id;
+    }
+
+    public function updateGame(int $id, string $name, int $year, int $bgg,
+        int $rating, int $playtime, string $parent, array $designers,
+        array $publishers, array $tags) {
+        if ($parent) {
+            $parentGame = $this->getGameByName($parent);
+            if ($parentGame) {
+                $parent = $parentGame['id'];
+            }
+        } else {
+            $parent = 0;
+        }
+
+        $stmt = $this->db->prepare(
+            "UPDATE games SET name = :name, year = :year, bgg = :bgg, rating = :rating,
+            playtime = :playtime, parent = :parent
+            WHERE id = :id"
+        );
+        $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
+        $stmt->bindValue(':name', $name, SQLITE3_TEXT);
+        $stmt->bindValue(':year', $year, SQLITE3_INTEGER);
+        $stmt->bindValue(':bgg', $bgg, SQLITE3_INTEGER);
+        $stmt->bindValue(':rating', $rating, SQLITE3_INTEGER);
+        $stmt->bindValue(':playtime', $playtime, SQLITE3_INTEGER);
+        $stmt->bindValue(':parent', $parent, SQLITE3_INTEGER);
+        $success = $stmt->execute();
+        if (!$success) {
+            return false;
+        }
+
+        $this->deleteGameEntities($id);
+        $this->deleteGameTags($id);
+
+        $entityIDs = array();
+        foreach ($designers as $designer) {
+            $dbDesigner = $this->getEntityByName($designer);
+            if (!$dbDesigner) {
+                $entityIDs[] = $this->insertEntity($designer, 'designer');
+            } else {
+                $entityIDs[] = $dbDesigner['id'];
+            }
+        }
+        foreach ($publishers as $publisher) {
+            $dbPublisher = $this->getEntityByName($publisher);
+            if (!$dbPublisher) {
+                $entityIDs[] = $this->insertEntity($publisher, 'publisher');                echo "Inserted $designer to DB<br />";
+            } else {
+                $entityIDs[] = $dbPublisher['id'];
+            }
+        }
+        foreach ($entityIDs as $entity_id) {
+            $stmt = $this->db->prepare(
+                "INSERT INTO game_entities (game_id, entity_id)
+                VALUES (:game_id, :entity_id)"
+            );
+            $stmt->bindValue(':game_id', $id, SQLITE3_INTEGER);
+            $stmt->bindValue(':entity_id', $entity_id, SQLITE3_INTEGER);
+            $stmt->execute();
+        }
+
+        $tagIDs = array();
+        foreach ($tags as $tagName) {
+            $tag = $this->getTagByName($tagName);
+            if ($tag) {
+                $tagIDs[] = $tag['id'];
+            } else {
+                $tagIDs[] = $this->insertTag($tagName);
+            }
+        }
+
+        foreach ($tagIDs as $tag_id) {
+            $stmt = $this->db->prepare(
+                "INSERT INTO game_taxonomy (game_id, tag_id)
+                VALUES (:game_id, :tag_id)"
+            );
+            $stmt->bindValue(':game_id', $id, SQLITE3_INTEGER);
+            $stmt->bindValue(':tag_id', $tag_id, SQLITE3_INTEGER);
+            $stmt->execute();
+        }
+
+        return $success;
     }
 
     public function savePlay($args) {
@@ -289,6 +425,34 @@ class Database {
         return false;
     }
 
+    public function getTagByName($name) {
+    	$query = 'SELECT * FROM tags WHERE name = :name';
+    	$stmt = $this->db->prepare($query);
+        $stmt->bindValue(':name', $name, SQLITE3_TEXT);
+        $result = $stmt->execute();
+        $row = $result->fetchArray(SQLITE3_ASSOC);
+        return $row;
+    }
+
+    public function getTagByID($id) {
+    	$query = 'SELECT * FROM tags WHERE id = :id';
+    	$stmt = $this->db->prepare($query);
+        $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
+        $result = $stmt->execute();
+        $row = $result->fetchArray(SQLITE3_ASSOC);
+        return $row;
+    }
+
+    public function insertTag($name) {
+        $stmt = $this->db->prepare("INSERT INTO tags (name) VALUES (:name)");
+        $stmt->bindValue(':name', $name, SQLITE3_TEXT);
+        $success = $stmt->execute();
+        if ($success) {
+            return $this->db->lastInsertRowID();
+        }
+        return false;
+    }
+
     public function getGames() {
         $stmt = $this->db->prepare('SELECT * FROM games');
         $result = $stmt->execute();
@@ -369,6 +533,51 @@ class Database {
     public function deletePlay(int $id) {
         $stmt = $this->db->prepare('DELETE FROM plays WHERE id = :id');
         $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
-        return $stmt->execute(); 
+        return $stmt->execute();
+    }
+
+    public function getTags(int $game) {
+        $stmt = $this->db->prepare('SELECT * FROM game_taxonomy, tags WHERE game_id = :game AND tags.id = tag_id');
+        $stmt->bindValue(':game', $game, SQLITE3_INTEGER);
+        $result = $stmt->execute();
+        $tags = [];
+        while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+            $tags[] = $row;
+        }
+        return $tags;
+    }
+
+    public function getEntities(int $game) {
+        $stmt = $this->db->prepare('SELECT * FROM game_entities, entities WHERE game_id = :game AND entities.id = entity_id');
+        $stmt->bindValue(':game', $game, SQLITE3_INTEGER);
+        $result = $stmt->execute(); 
+        $entities = [];
+        while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+            $entities[] = $row;
+        }
+        return $entities;
+    }
+
+    public function deleteGame(int $id) {
+        $stmt = $this->db->prepare('DELETE FROM games WHERE id = :id');
+        $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
+        $result = $stmt->execute();
+        if ($result) {
+            $this->deleteGameEntities($id);
+            $this->deleteGameTags($id);
+        }
+        return $result;
+    }
+
+    private function deleteGameEntities(int $id) {
+        $stmt = $this->db->prepare('DELETE FROM game_entities WHERE game_id = :id');
+        $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
+        return $stmt->execute();
+    }
+
+    private function deleteGameTags(int $id) {
+        $stmt = $this->db->prepare('DELETE FROM game_taxonomy WHERE game_id = :id');
+        $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
+        return $stmt->execute();
     }
 }

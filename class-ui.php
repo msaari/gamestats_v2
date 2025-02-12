@@ -4,6 +4,7 @@ class UI {
     private $db;
     private $status;
     private $playFormID;
+    private $gameFormID;
 
 	public function __construct($db) {
         $this->db = $db;
@@ -16,6 +17,10 @@ class UI {
 
     public function showPlayForm(int $play) {
         $this->playFormID = $play;
+    }
+
+    public function showGameForm(int $game) {
+        $this->gameFormID = $game;
     }
 
     public function playForm(int $play = 0) {
@@ -83,6 +88,133 @@ class UI {
         if ($play) {
             ?>
     <input type="hidden" name="id" value="<?php echo $play['id']; ?>" />
+            <?php
+        }
+    ?>
+    <footer class="c-card__footer">
+        <button type="submit" class="c-button c-button--brand c-button--block">
+            Tallenna
+        </button>
+    </footer>
+</form>
+
+<br />
+<hr />
+
+        <?php
+    }
+
+    public function gameForm(int $game = 0) {
+        if ($game) {
+            $game = $this->db->getGame($game);
+            $name = $game['name'];
+            $year = $game['year'];
+            $bgg = $game['bgg'];
+            $playtime = $game['playtime'];
+            $parent = $game['parent'];
+            $rating = $game['rating'];
+            $parentObj = $this->db->getGame($parent);
+            $parentName = '';
+            if ($parentObj) {
+               $parentName = $parentObj['name'];
+            }
+            $entities = $this->db->getEntities($game['id']);
+            $designers = array();
+            $publishers = array();
+            foreach ($entities as $entity) {
+                if ($entity['type'] === 'publisher') {
+                    $publishers[] = $entity['name'];
+                }
+                if ($entity['type'] === 'designer') {
+                    $designers[] = $entity['name'];
+                }
+            }
+            $designers = implode(', ', $designers);
+            $publishers = implode(', ', $publishers);
+            $tagsArray = $this->db->getTags($game['id']);
+            $tags = array();
+            foreach ($tagsArray as $tag) {
+                $tags[] = $tag['name'];
+            }
+            $tags = implode(', ', $tags);
+        } else {
+            $name = "";
+            $year = 2025;
+            $playtime = 0;
+            $bgg = 0;
+            $parentName = "";
+            $rating = 0;
+            $designers = '';
+            $publishers = '';
+            $tags = '';
+        }
+        ?>
+<form method="post" class="o-container o-container--small c-card u-high playform">
+    <div class="c-card__body">
+        <div class="o-form-element">
+            <label for="name" class="c-label">Nimi:
+            <input type="name" name="name" value="<?php echo $name; ?>" class="c-field c-field--label" data-1p-ignore>
+            </label>
+        </div>
+
+        <div class="o-form-element">
+            <label for="designers" class="c-label">Suunnittelijat:
+            <input type="designers" name="designers" value="<?php echo $designers; ?>" class="c-field c-field--label" data-1p-ignore>
+            </label>
+        </div>
+
+        <div class="o-form-element">
+            <label for="publishers" class="c-label">Julkaisijat:
+            <input type="publishers" name="publishers" value="<?php echo $publishers; ?>" class="c-field c-field--label" data-1p-ignore>
+            </label>
+        </div>
+
+        <div class="o-grid">
+            <div class="o-form-element o-grid-cell">
+                <label for="year" class="c-label">Vuosi:
+                <input type="number" name="year"  value="<?php echo $year; ?>" class="c-field c-field--label">
+                </label>
+            </div>
+
+            <div class="o-form-element o-grid-cell">
+                <label for="playtime">Pituus:
+                <input type="number" name="playtime" value="<?php echo $playtime; ?>" class="c-field c-field--label">
+                </label>
+            </div>
+        </div>
+
+        <div class="o-grid">
+            <div class="o-form-element o-grid-cell">
+                <label for="bgg">BGG ID:
+                <input type="number" name="bgg" value="<?php echo $bgg; ?>" class="c-field c-field--label">
+                </label>
+            </div>
+
+            <div class="o-form-element o-grid-cell">
+                <label for="rating">Reittaus:
+                <input type="number" name="rating" value="<?php echo $rating; ?>" class="c-field c-field--label">
+                </label>
+            </div>
+        </div>
+
+        <div class="o-form-element">
+            <label for="parent" class="c-label">Emopeli:
+            <input type="text" name="parent" list="games" value="<?php echo $parentName; ?>" class="c-field c-field--label">
+            </label>
+        </div>
+
+        <div class="o-form-element">
+            <label for="tags" class="c-label">Avainsanat:
+            <input type="text" name="tags" value="<?php echo $tags; ?>" class="c-field c-field--label">
+            </label>
+        </div>
+    </div>
+    
+    <input type="hidden" name="action" value="save_game">
+    <?php
+        if ($game) {
+            ?>
+    <input type="hidden" name="id" value="<?php echo $game['id']; ?>" />
             <?php
         }
     ?>
@@ -249,9 +381,14 @@ class UI {
 			<?php
 		endif;
 		if ( isset($this->status['confirm']) ) :
+            $url = $this->getURLString([
+                'confirm' => $this->status['action'],
+                'id' => $this->status['id'],
+                'nonce' => time(),
+            ]);
 			?>
 		<div role="alert" class="c-alert c-alert--info"><strong><?php echo $this->status['confirm']; ?></strong>
-			<a class="c-button c-button--brand" href="?confirm=<?php echo $this->status['action']; ?>&id=<?php echo $this->status['id']; ?>&nonce=<?php echo time(); ?>">Kyllä!</a>
+			<a class="c-button c-button--brand" href="?<?php echo $url; ?>">Kyllä!</a>
 		</div>
 			<?php
 		endif;
@@ -261,6 +398,9 @@ class UI {
         $this->displayStatus();
         if ($this->playFormID) {
             $this->playForm($this->playFormID);
+        }
+        if ($this->gameFormID) {
+            $this->gameForm($this->gameFormID);
         }
         if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays') {
             $this->showPlays();
@@ -559,6 +699,17 @@ new Chart(ctx_y, {
 
 <div class="spacer"></div>
 
+        <form method="get">
+        <?php if (isset($_REQUEST['orderby'])) : ?>
+            <input type="hidden" name="orderby" value="<?php echo $_REQUEST['orderby']; ?>">
+        <?php endif; ?>
+            <input type="hidden" name="tab" value="<?php echo $_REQUEST['tab']; ?>">
+            <button type="submit" name="incomplete" value="1" class="c-button c-button--brand">Keskeneräiset</button>
+            <button type="submit" name="no_exp" value="1" class="c-button c-button--brand">Ei lisäosia</button>
+        </form>
+
+<div class="spacer"></div>
+
 <table class="c-table c-table--striped">
     <thead class="c-table__head">
         <tr class="c-table__row c-table__row--heading">
@@ -581,8 +732,16 @@ new Chart(ctx_y, {
 
         $totals = ['plays' => 0, 'hours' => 0, 'wins' => 0, 'rating' => 0];
         foreach ($games as $game) {
-            if ($game->plays < 1) {
+            if (isset($_REQUEST['no_exp']) && $game->parent) {
                 continue;
+            }
+
+            if (isset($_REQUEST['incomplete']) && ( $game->rating || $game->year)) {
+                continue;
+            }
+
+            if ($game->plays < 1) {
+                //continue;
             }
             if (!$game->parent) {
                 $totals['plays'] += $game->plays;
@@ -605,8 +764,15 @@ new Chart(ctx_y, {
             <td class="c-table__cell"><?php echo $game->year; ?></td>
             <td class="c-table__cell wide_cell-2">
                 <span class="c-input-group">
-                    <a href="?edit_game=<?php echo $game->id; ?>" class="c-button c-button--brand u-xsmall">muuta</a>
-                    <a href="?delete_game=<?php echo $game->id; ?>&amp;nonce=<?php echo time(); ?>" class="c-button u-xsmall c-button--error">poista</a>
+                    <?php
+                    $editUrl = $this->getURLString(['edit_game' => $game->id]);
+                    $deleteUrl = $this->getURLString([
+                        'delete_game' => $game->id,
+                        'nonce' => time(),
+                    ]);
+                    ?>
+                    <a href="?<?php echo $editUrl; ?>" class="c-button c-button--brand u-xsmall">muuta</a>
+                    <a href="?<?php echo $deleteUrl; ?>" class="c-button u-xsmall c-button--error">poista</a>
                 </span>
             </td>
         </tr>
@@ -619,7 +785,7 @@ new Chart(ctx_y, {
             <td class="c-table__cell wide_cell-4">Yhteiskesto <?php echo round($totals['hours'] / 60, 0); ?> tuntia.</td>
             <td class="c-table__cell"><?php echo $totals['plays']; ?></td>
             <td class="c-table__cell"><?php echo $totals['wins']; ?></td>
-            <td class="c-table__cell"><?php echo round($totals['rating'] / $totals['plays'], 2); ?></td>
+            <td class="c-table__cell"><?php $tp = $totals['plays'] ? $totals['plays'] : 1; echo round($totals['rating'] / $tp, 2); ?></td>
             <td class="c-table__cell"></td>
             <td class="c-table__cell"></td>
             <td class="c-table__cell"></td>
@@ -637,7 +803,7 @@ new Chart(ctx_y, {
     }
 
     private function getURLString($args) {
-        $pickupArgs = ['tab', '12months', 'everything', 'lastyear', 'thisyear', 'from', 'to'];
+        $pickupArgs = ['tab', '12months', 'everything', 'lastyear', 'thisyear', 'from', 'to', 'incomplete', 'no_exp'];
         foreach ($pickupArgs as $arg) {
             if (isset($_REQUEST[ $arg ])) {
                 $args[ $arg ] = $_REQUEST[ $arg ];
