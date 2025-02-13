@@ -341,7 +341,7 @@ class Database {
     public function savePlay($args) {
         $game = $this->getGameByName($args['game']);
         if (!$game) {
-            $game_id = $this->insertGame($args['game'], 0, 0, 0, 0, 0, array(), array(), '');
+            $game_id = $this->insertGame($args['game'], 0, 0, 0, 0, 0, array(), array(), array());
         } else {
             $game_id = $game['id'];
         }

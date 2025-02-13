@@ -11,6 +11,25 @@ class UI {
         $this->playFormID = 0;
     }
 
+    public function render() {
+        $this->displayStatus();
+        if ($this->playFormID) {
+            $this->playForm($this->playFormID);
+        }
+        if ($this->gameFormID) {
+            $this->gameForm($this->gameFormID);
+        }
+        if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays') {
+            $this->showPlays();
+        }
+        if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'games') {
+            $this->showGames();
+        }
+        if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'addplay') {
+            $this->playForm();
+        }
+    }
+
     public function setStatus($status, $message) {
 		$this->status[$status] = $message;
 	}
@@ -48,6 +67,8 @@ class UI {
         }
 
         ?>
+<div class="spacer"></div>
+
 <form method="post" class="o-container o-container--small c-card u-high playform">
     <div class="c-card__body">
         <div class="o-form-element">
@@ -98,8 +119,7 @@ class UI {
     </footer>
 </form>
 
-<br />
-<hr />
+<div class="spacer"></div>
 
         <?php
     }
@@ -338,6 +358,7 @@ class UI {
         <div role="tablist" class="c-tabs">
             <div class="c-tabs__nav">
                 <div class="c-tabs__headings">
+                    <a href="/?tab=addplay" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'addplay' && printf('c-tab-heading--active') ?>">Lisää pelikerta</a>
                     <a href="/?tab=plays" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays' && printf('c-tab-heading--active') ?>">Pelikerrat</a>
                     <a href="/?tab=games" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'games' && printf('c-tab-heading--active') ?>">Pelit</a>
                 </div>
@@ -393,22 +414,6 @@ class UI {
 			<?php
 		endif;
 	}
-
-    public function render() {
-        $this->displayStatus();
-        if ($this->playFormID) {
-            $this->playForm($this->playFormID);
-        }
-        if ($this->gameFormID) {
-            $this->gameForm($this->gameFormID);
-        }
-        if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays') {
-            $this->showPlays();
-        }
-        if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'games') {
-            $this->showGames();
-        }
-    }
 
     private function showPlays() {
         $game = '';
@@ -741,7 +746,7 @@ new Chart(ctx_y, {
             }
 
             if ($game->plays < 1) {
-                //continue;
+                continue;
             }
             if (!$game->parent) {
                 $totals['plays'] += $game->plays;
