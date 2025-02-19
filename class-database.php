@@ -453,9 +453,24 @@ class Database {
         return false;
     }
 
-    public function getGames() {
-        $stmt = $this->db->prepare('SELECT * FROM games');
-        $result = $stmt->execute();
+    public function getGames(array $args) {
+        $query = 'SELECT * FROM games';
+        $bind = [];
+
+        if (isset($args['rating']) && is_numeric($args['rating'])) {
+            $query .= ' WHERE rating >= :rating';
+            $bind['rating'] = (int) $args['rating'];
+        }
+
+        if (count($bind) > 0) {
+            $stmt = $this->db->prepare($query);
+            foreach ($bind as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $result = $stmt->execute();
+        } else {
+            $result = $this->db->query($query);
+        }
         $games = [];
         while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
             $games[] = $row;
@@ -483,6 +498,10 @@ class Database {
             $query .= ' AND plays.date >= :from AND plays.date <= :to';
             $bind[':from'] = $args['from'];
             $bind[':to'] = $args['to'];
+        }
+        if (isset($args['rating']) && is_numeric($args['rating'])) {
+            $query .= ' AND games.rating >= :rating';
+            $bind[':rating'] = (int) $args['rating'];
         }
         $query .= " ORDER BY date DESC";
         if (isset($args['limit']) && is_numeric($args['limit']) && $args['limit'] > 0) {

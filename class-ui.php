@@ -19,15 +19,22 @@ class UI {
         if ($this->gameFormID) {
             $this->gameForm($this->gameFormID);
         }
-        if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays') {
-            $this->showPlays();
-        }
-        if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'games') {
-            $this->showGames();
-        }
-        if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'addplay') {
-            $this->playForm();
-        }
+        if (isset($_REQUEST['tab'])) {
+            switch ( $_REQUEST['tab'] ) {
+                case 'plays':
+                    $this->showPlays();
+                    break;
+                case 'games':
+                    $this->showGames();
+                    break;
+                case 'addplay':
+                    $this->playForm();
+                    break;
+                case 'top100':
+                    $this->showTop100();
+                    break;
+            }
+        }   
     }
 
     public function setStatus($status, $message) {
@@ -263,95 +270,10 @@ class UI {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <?php endif; ?>
 
-    <style>    	
-        .playform .o-grid {
-            gap: 10px;
-        }
-
-        .wide_cell-4, .c-table__row--heading .wide_cell-4 {
-            flex-grow: 4;
-        }
-
-        .wide_cell-2, .c-table__row--heading .wide_cell-2 {
-            flex-grow: 2;
-        }
-
-        .c-button.c-button--brand {
-            --button-background: #2c3e50;
-        }
-
-        .pale {
-            color: #bbbbbb;
-        }
-        
-        .game_expansion {
-            color: #006400;
-            font-size: small;
-            font-variant-caps: all-small-caps;
-            margin-right: 0.5em;
-        }
-
-        .rating {
-            display: inline-block;
-            width: 30px;
-            height: 25px;
-            text-align: center;
-            color: #000000;
-        }
-
-        .rating-10 {
-            background-color: #00cc00;
-        }
-
-        .rating-9 {
-            background-color: #33cc99;
-        }
-
-        .rating-8 {
-            background-color: #66ff99;
-        }
-
-        .rating-7 {
-            background-color: #99ffff;
-        }
-
-        .rating-6 {
-            background-color: #9999ff;
-        }
-
-        .rating-5 {
-            background-color: #cc99ff;
-        }
-
-        .rating-4 {
-            background-color: #ff66cc;
-        }
-
-        .rating-3 {
-            background-color: #ff6699;
-        }
-
-        .rating-2 {
-            background-color: #ff3366;
-        }
-
-        .rating-1 {
-            background-color: #ff0000;
-        }
-
-        .c-table__row--heading .c-table__cell.u-small {
-            font-size: var(--text-font-size-small);
-        }
-
-        input[type="date"] {
-            font-family: Helvetica, sans-serif
-        }
-
-        .spacer {
-            height: 1em;
-        }
-
+<style>
+<?php require_once 'style.css'; ?>
 </style>
+
 </head>
 <body>
     <div class="o-container o-container--large u-text">
@@ -361,6 +283,7 @@ class UI {
                     <a href="/?tab=addplay" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'addplay' && printf('c-tab-heading--active') ?>">Lisää pelikerta</a>
                     <a href="/?tab=plays" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays' && printf('c-tab-heading--active') ?>">Pelikerrat</a>
                     <a href="/?tab=games" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'games' && printf('c-tab-heading--active') ?>">Pelit</a>
+                    <a href="/?tab=top100" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'top100' && printf('c-tab-heading--active') ?>">Top 100</a>
                 </div>
             </div>
         </div>
@@ -424,7 +347,9 @@ class UI {
         $limit = 0;
 
         list('from' => $from, 'to' => $to) = $this->getDateRange();
-        if (!isset($_REQUEST['from']) && !isset($_REQUEST['to']) && !isset($_REQUEST['game'])) {
+        if (!isset($_REQUEST['from']) && !isset($_REQUEST['to']) && !isset($_REQUEST['game'])
+            && !isset($_REQUEST['lastyear']) && !isset($_REQUEST['thisyear'])
+            && !isset($_REQUEST['12months']) && !isset($_REQUEST['everything'])) {
             $limit = 120;
         }
 
@@ -805,6 +730,22 @@ new Chart(ctx_y, {
     </tbody>
 </table>
         <?php
+    }
+
+    private function showTop100() {
+        $cut_year = date("Y") - 2;
+        $from = "$cut_year-01-01";
+        $plays = $this->db->getPlays(['from' => $from, 'to' => date('Y-m-d'), 'rating' => 7]);
+
+        $games = [];
+        foreach ($plays as $play) {
+            $games[$play['name']] = true;
+        }
+        $games = array_keys($games);
+        asort($games);
+        foreach ($games as $game) {
+            echo "$game<br>";
+        }
     }
 
     private function getURLString($args) {
