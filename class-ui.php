@@ -33,6 +33,12 @@ class UI {
                 case 'top100':
                     $this->showTop100();
                     break;
+                case 'firstplays':
+                    $this->showFirstPlays();
+                    break;
+                case 'years':
+                    $this->showYears();
+                    break;
             }
         }   
     }
@@ -74,8 +80,6 @@ class UI {
         }
 
         ?>
-<div class="spacer"></div>
-
 <form method="post" class="o-container o-container--small c-card u-high playform">
     <div class="c-card__body">
         <div class="o-form-element">
@@ -265,6 +269,9 @@ class UI {
 <head>
     <title>Gamestats</title>
     <link rel="stylesheet" href="https://unpkg.com/@blaze/css@x.x.x/dist/blaze/blaze.css">
+    <script type="module" src="https://unpkg.com/@blaze/atoms@x.x.x/dist/blaze-atoms/blaze-atoms.esm.js"></script>
+    <script nomodule="" src="https://unpkg.com/@blaze/atoms@x.x.x/dist/blaze-atoms/blaze-atoms.js"></script>
+
 
 <?php if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays') : ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -284,9 +291,13 @@ class UI {
                     <a href="/?tab=plays" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays' && printf('c-tab-heading--active') ?>">Pelikerrat</a>
                     <a href="/?tab=games" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'games' && printf('c-tab-heading--active') ?>">Pelit</a>
                     <a href="/?tab=top100" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'top100' && printf('c-tab-heading--active') ?>">Top 100</a>
+                    <a href="/?tab=firstplays" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'firstplays' && printf('c-tab-heading--active') ?>">Debyytit</a>
+                    <a href="/?tab=years" role="tab" class="c-tab-heading <?php isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'years' && printf('c-tab-heading--active') ?>">Vuodet</a>
                 </div>
             </div>
         </div>
+
+        <div class="spacer"></div>
 
         <?php
 	}
@@ -295,7 +306,7 @@ class UI {
         ?>
         <datalist id="games">
         <?php
-            $games = $this->db->getGames();
+            $games = $this->db->getGames([]);
             $gameList = array();
             foreach ($games as $game) {
                 $gameList[] = $game['name'];
@@ -355,8 +366,6 @@ class UI {
 
         $plays = $this->db->getPlays(['limit' => $limit, 'game' => $game, 'from' => $from, 'to' => $to]);
         ?>
-
-<div class="spacer"></div>
 
         <?php
         $this->dateRangeButtons($from, $to, 'plays');
@@ -548,7 +557,7 @@ new Chart(ctx_y, {
     }
 
     private function showGames() {
-        $gamesData = $this->db->getGames();
+        $gamesData = $this->db->getGames([]);
 
         $games = array();
         foreach ($gamesData as $game) {
@@ -620,8 +629,6 @@ new Chart(ctx_y, {
 
         $i = 1;
         ?>
-
-<div class="spacer"></div>
 
         <?php
         $this->dateRangeButtons($from, $to, 'games');
@@ -737,15 +744,162 @@ new Chart(ctx_y, {
         $from = "$cut_year-01-01";
         $plays = $this->db->getPlays(['from' => $from, 'to' => date('Y-m-d'), 'rating' => 7]);
 
+        $parents = $this->db->getParentNames();
         $games = [];
         foreach ($plays as $play) {
-            $games[$play['name']] = true;
+            $name = $play['name'];
+            if (isset($parents[$name])) {
+                $name = $parents[$name];
+            }
+            $games[$name] = true;
         }
         $games = array_keys($games);
         asort($games);
         foreach ($games as $game) {
             echo "$game<br>";
         }
+    }
+
+    private function showFirstPlays() {
+        $plays = $this->db->getPlays([]);
+
+        $gameFirstPlays = [];
+        foreach ($plays as $play) {
+            if (!isset($gameFirstPlays[$play['name']])) {
+                $gameFirstPlays[$play['name']] = $play['date'];
+            } else {
+                if ($play['date'] < $gameFirstPlays[$play['name']]) {
+                    $gameFirstPlays[$play['name']] = $play['date'];
+                }
+            }
+        }
+        asort($gameFirstPlays);
+        $currentYear = 0;
+        $cumulative = 0;
+        $yearData = '';
+        $yearTotal = 0;
+
+        ?>
+        <blaze-accordion>
+            <?php
+
+        foreach ($gameFirstPlays as $game => $date) {
+            $time = strtotime($date);
+            $year = date('Y', $time);
+            if ($currentYear != $year) {
+                if ($currentYear != 0) {
+                    $yearData .= <<<EOHTML
+                            </tbody>
+                        </table>
+                    </blaze-accordion-pane>
+                    EOHTML;
+                    echo str_replace('####', $yearTotal, $yearData);
+                }
+                $yearData = <<<EOHTML
+                <blaze-accordion-pane header="$year (yhteensä: ####)">
+                    <table class="c-table c-table--striped">
+                        <thead class="c-table__head">
+                            <tr class="c-table__row c-table__row--heading">
+                                <td class="c-table__cell">#</td>
+                                <td class="c-table__cell wide_cell-4">Peli</td>
+                                <td class="c-table__cell">Pvm</td>
+                            </tr>
+                        </thead>
+                        <tbody class="c-table__body">
+                EOHTML;
+                $currentYear = $year;
+                $yearTotal = 0;
+            }
+            $displayDate = date('j.n.Y', $time);
+            $cumulative++;
+            $yearTotal++;
+
+            $yearData .= <<<EOHTML
+                <tr class="c-table__row">
+                    <td class="c-table__cell">$cumulative</td>
+                    <td class="c-table__cell wide_cell-4">$game</td>
+                    <td class="c-table__cell">$displayDate</td>
+                </tr>
+            EOHTML;
+        }
+        echo str_replace('####', $yearTotal, $yearData);
+
+            ?>
+                    </tbody>
+                </table>
+            </blaze-accordion-pane>
+        </blaze-accordion>
+        <?php
+    }
+
+    private function showYears() {
+        $plays = $this->db->getPlays([]);
+        $games = $this->db->getGames([]);
+
+        $gameLengths = [];
+        foreach ($games as $game) {
+            $gameLengths[$game['name']] = $game['playtime'];
+        }
+        unset($games);
+
+        $years = [];
+        foreach ($plays as $play) {
+            if (date('j.n.Y', strtotime($play['date'])) == '1.1.2001') {
+                continue;
+            }
+            $year = date('Y', strtotime($play['date']));
+            
+            if (!isset($years[$year])) {
+                $years[$year]['plays'] = 0;
+                $years[$year]['games'] = [];
+                $years[$year]['players'] = 0;
+                $years[$year]['minutes'] = 0;
+            }
+
+            $years[$year]['plays'] += $play['plays'];
+            $years[$year]['players'] += $play['plays'] * $play['players'];
+            $years[$year]['minutes'] += $play['plays'] * $gameLengths[$play['name']];
+            $years[$year]['games'][$play['name']] = true;
+        }
+
+        ksort($years);
+
+        ?>
+            <table class="c-table c-table--striped">
+                <thead class="c-table__head">
+                    <tr class="c-table__row c-table__row--heading">
+                        <td class="c-table__cell">Vuosi</td>
+                        <td class="c-table__cell">Erät</td>
+                        <td class="c-table__cell">Pelit</td>
+                        <td class="c-table__cell">Pelaajien ka</td>
+                        <td class="c-table__cell">Tunnit</td>
+                        <td class="c-table__cell">Keskipituus</td>
+                    </tr>
+                </thead>
+                <tbody class="c-table__body">
+            <?php
+
+        foreach ($years as $year => $yearData) {
+            $avgPlayers = round($yearData['players'] / $yearData['plays'], 2);
+            $totalHours = round($yearData['minutes'] / 60, 0);
+            $avgPlaytime = round($yearData['minutes'] / $yearData['plays'], 1);
+            $games = count($yearData['games']);
+            ?>
+                <tr class="c-table__row">
+                    <td class="c-table__cell"><?php echo $year; ?></td>
+                    <td class="c-table__cell"><?php echo $yearData['plays']; ?></td>
+                    <td class="c-table__cell"><?php echo $games; ?></td>
+                    <td class="c-table__cell"><?php echo $avgPlayers; ?></td>
+                    <td class="c-table__cell"><?php echo $totalHours; ?></td>
+                    <td class="c-table__cell"><?php echo $avgPlaytime; ?></td>
+                </tr>
+            <?php
+        }
+
+        ?>
+                </tbody>
+            </table>
+        <?php
     }
 
     private function getURLString($args) {

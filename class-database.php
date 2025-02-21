@@ -234,6 +234,7 @@ class Database {
             $stmt->execute();
         }
 
+        $tagIDs = array();
         foreach ($tags as $tagName) {
             $tag = $this->getTagByName($tagName);
             if ($tag) {
@@ -476,6 +477,22 @@ class Database {
             $games[] = $row;
         }
         return $games;
+    }
+
+    public function getParentNames() {
+        $query = 'SELECT g.id, g.name, par.id AS parent_id, par.name AS parent_name
+            FROM games AS g, games AS par WHERE g.parent = par.id';
+        $result = $this->db->query($query);
+        $parents = [];
+        while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+            $parents[$row['name']] = $row['parent_name'];
+        }
+        foreach ($parents as $name => $parent) {
+            if (isset($parents[$parent])) {
+                $parents[$name] = $parents[$parent];
+            }
+        }
+        return $parents;
     }
 
     public function getPlays(array $args) {
