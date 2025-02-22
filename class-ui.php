@@ -584,20 +584,24 @@ new Chart(ctx_y, {
         $plays = $this->db->getPlays(['from' => $from, 'to' => $to]);
         foreach ($plays as $play) {
             $game = $games[ $play['game'] ];
-            $game->addPlays($play['plays']);
+            $game->addPlays($play);
             $game->addWins($play['wins']);
             if ($game->parent > 0) {
                 $parent = $games[ $game->parent ];
-                $parent->addPlays($play['plays']);
+                $parent->addPlays($play);
                 $parent->addWins($play['wins']);
 
                 if ($parent->parent > 0) {
                     $grandparent = $games[ $parent->parent ];
-                    $grandparent->addPlays($play['plays']);
+                    $grandparent->addPlays($play);
                     $grandparent->addWins($play['wins']);
                 }
             }
+        }
+
+        foreach ($games as $game) {
             $game->countHappinessHotness();
+            $game->countStayingPower('01-01-2001', $to);
         }
 
         $orderby = 'name';
@@ -617,11 +621,26 @@ new Chart(ctx_y, {
         if ($orderby === 'rating') {
             uasort($games, function($a, $b) { return $b->rating - $a->rating; });
         }
+        if ($orderby === 'mm') {
+            uasort($games, function($a, $b) { return $b->monthMetric - $a->monthMetric; });
+        }
+        if ($orderby === 'ym') {
+            uasort($games, function($a, $b) {
+                $aYears = date("Y") - $a->firstYear + 1;
+                $bYears = date("Y") - $b->firstYear + 1;
+                $aScore = $a->yearMetric * 2 - $aYears + $a->yearMetric;
+                $bScore = $b->yearMetric * 2 - $bYears + $b->yearMetric;
+                return $bScore - $aScore;
+            });
+        }
         if ($orderby === 'happiness') {
             uasort($games, function($a, $b) { return $b->happiness <=> $a->happiness; });
         }
         if ($orderby === 'hotness') {
             uasort($games, function($a, $b) { return $b->hotness <=> $a->hotness; });
+        }
+        if ($orderby === 'sp') {
+            uasort($games, function($a, $b) { return $b->stayingPower <=> $a->stayingPower; });
         }
         if ($orderby === 'year') {
             uasort($games, function($a, $b) { return $a->year - $b->year; });
@@ -655,11 +674,11 @@ new Chart(ctx_y, {
             <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'plays'])?>">Pelit</a></th>
             <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'wins'])?>">Voitot</a></th>
             <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'rating'])?>">Reittaus</a></th>
-            <th class="u-small c-table__cell">MM</th>
-            <th class="u-small c-table__cell">YM</th>
+            <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'mm'])?>">MM</a></th>
+            <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'ym'])?>">YM</a></th>
             <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'happiness'])?>">HHM</a></th>
             <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'hotness'])?>">Hotness</a></th>
-            <th class="u-small c-table__cell">SP</th>
+            <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'sp'])?>">SP</a></th>
             <th class="u-small c-table__cell"><a class="c-link" href="/?<?php echo $this->getURLString(['orderby' => 'year'])?>">Vuosi</a></th>
             <th class="u-small c-table__cell wide_cell-2">Työkalut</th>
         </tr>
@@ -690,14 +709,14 @@ new Chart(ctx_y, {
         <tr class="c-table__row">
             <td class="c-table__cell pale"><?php echo $i++; ?></td>
             <td class="c-table__cell wide_cell-4"><?php echo $game->getName(); ?></td>
-            <td class="c-table__cell"><?php echo $game->plays ?> <span class="u-small pale">&nbsp;/&nbsp;<?php echo $game->totalplays; ?></span></td>
+            <td class="c-table__cell"><?php echo $game->echoPlays(); ?></td>
             <td class="c-table__cell"><?php echo $game->wins; ?></td>
             <td class="c-table__cell"><?php echo $game->getRating(); ?></td>
-            <td class="c-table__cell"><?php echo "0"; ?></td>
-            <td class="c-table__cell"><?php echo "0"; ?></td>
+            <td class="c-table__cell"><?php echo $game->monthMetric; ?></td>
+            <td class="c-table__cell"><?php echo $game->echoYearMetric($to); ?></td>
             <td class="c-table__cell"><?php echo $game->happiness; ?></td>
             <td class="c-table__cell"><?php echo $game->hotness; ?></td>
-            <td class="c-table__cell"><?php echo "0"; ?></td>
+            <td class="c-table__cell"><?php echo $game->stayingPower; ?></td>
             <td class="c-table__cell"><?php echo $game->year; ?></td>
             <td class="c-table__cell wide_cell-2">
                 <span class="c-input-group">
@@ -903,7 +922,8 @@ new Chart(ctx_y, {
     }
 
     private function getURLString($args) {
-        $pickupArgs = ['tab', '12months', 'everything', 'lastyear', 'thisyear', 'from', 'to', 'incomplete', 'no_exp'];
+        $pickupArgs = ['tab', '12months', 'everything', 'lastyear', 'thisyear', 'from', 'to',
+        'incomplete', 'no_exp'];
         foreach ($pickupArgs as $arg) {
             if (isset($_REQUEST[ $arg ])) {
                 $args[ $arg ] = $_REQUEST[ $arg ];

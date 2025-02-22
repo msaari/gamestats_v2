@@ -13,6 +13,14 @@ class Game {
     public $playtime;
     public $happiness;
     public $hotness;
+    public $playsPerYear;
+    public $stayingPower;
+    public $months;
+    public $years;
+    public $firstYear;
+    public $lastYear;
+    public $monthMetric;
+    public $yearMetric;
 
     public function __construct($args) {
         $this->id = $args['id'];
@@ -27,10 +35,43 @@ class Game {
         $this->hotness = 0;
         $this->plays = 0;
         $this->wins = 0;
+        $this->firstYear = 9999;
+        $this->lastYear = 0;
+        $this->monthMetric = 0;
+        $this->yearMetric = 0;
+        $this->stayingPower = 0;
+        $this->playsPerYear = [];
+        $this->months = [];
+        $this->years = [];
     }
 
-    public function addPlays(int $plays) {
-        $this->plays += $plays;
+    public function addPlays(array $play) {
+        if (!isset($play['plays']) || !isset($play['date'])) {
+            return;
+        }
+        $this->plays += $play['plays'];
+
+        $year = date('Y', strtotime($play['date']));
+        if (!isset($this->playsPerYear[$year])) {
+            $this->playsPerYear[$year] = 0;
+        }
+        $this->playsPerYear[$year] += $play['plays'];
+
+        $month = date('m', strtotime($play['date']));
+        $metricMonth = "$year/$month";
+
+        $this->months[$metricMonth] = true;
+        $this->years[$year] = true;
+        $this->monthMetric = count($this->months);
+        $this->yearMetric = count($this->years);
+
+        if ($year < $this->firstYear) {
+            $this->firstYear = $year;
+        }
+
+        if ($year > $this->lastYear) {
+            $this->lastYear = $year;
+        }
     }
 
     public function addTotalPlays(int $plays) {
@@ -68,5 +109,45 @@ class Game {
         if (is_nan($this->hotness)) {
             $this->hotness = 0;
         }
+    }
+
+    public function countStayingPower(string $from, string $to) {
+        $fromYear = date('Y', strtotime($from));
+        $toYear = date('Y', strtotime($to));
+        $sumOfWeights = 0;
+        for ($year = $fromYear; $year <= $toYear; $year++) {
+            $yearWeight = pow(5/6, $toYear-$year);
+            $sumOfWeights += $yearWeight;
+        }
+
+        $rawStayingPower = array_reduce(
+            array_keys($this->playsPerYear),
+            function($sp, $year) use ($toYear, $sumOfWeights) {
+                $plays = $this->playsPerYear[$year];
+                $yearWeight = pow(5/6, $toYear-$year);
+                $sp['sumOfValues'] += sqrt($plays) * $yearWeight;
+                $sp['weightedAverage'] = pow($sp['sumOfValues'] / $sumOfWeights, 2);
+                return $sp;
+            },
+            ['sumOfWeights' => 0, 'sumOfValues' => 0, 'weightedAverage' => 0]
+        );
+        $lengthStayingPower = $rawStayingPower['weightedAverage'] * ($this->playtime / 60);
+        $this->stayingPower = round($lengthStayingPower, 3);
+    }
+
+    public function echoPlays() {
+        $result = $this->plays;
+        if ($this->totalplays != $this->plays) {
+            $result .=  "<span class='u-small pale'>&nbsp;/&nbsp; $this->totalplays</span>";
+        }
+        return $result;
+    }
+
+    public function echoYearMetric(string $to) {
+        $toYear = date("Y", strtotime($to));
+        $totalYears = $toYear - $this->firstYear + 1;
+        $asterisk = $this->lastYear !== $toYear ? '*' : '';
+        $result = $this->yearMetric . '/' . $totalYears . $asterisk;
+        return $result;
     }
 }
