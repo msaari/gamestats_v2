@@ -5,11 +5,16 @@ define( "NONCE_LIMIT", 60 * 15 );
 require_once 'class-database.php';
 require_once 'class-ui.php';
 require_once 'class-game.php';
+require_once 'class-login.php';
 
 $db = new Database();
+$login = new Login($db);
 $ui = new UI($db);
 
 $ui->showHeader();
+
+$login->handleLoginActions();
+$login->checkUser();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'save_play') {

@@ -610,7 +610,7 @@ new Chart(ctx_y, {
         }
 
         if ($orderby === 'name') {
-            uasort($games, function($a, $b) { return strcasecmp($a->name, $b->name); });
+            uasort($games, function($a, $b) { return strcasecmp($this->handleArticles($a->name), $this->handleArticles($b->name)); });
         }
         if ($orderby === 'plays') {
             uasort($games, function($a, $b) { return $b->plays - $a->plays; });
@@ -773,10 +773,12 @@ new Chart(ctx_y, {
             $games[$name] = true;
         }
         $games = array_keys($games);
-        asort($games);
+        usort($games, array($this, 'articleSort'));
+        echo "<textarea rows='100' cols='80'>";
         foreach ($games as $game) {
-            echo "$game<br>";
+            echo "$game\n";
         }
+        echo "</textarea>";
     }
 
     private function showFirstPlays() {
@@ -986,5 +988,18 @@ new Chart(ctx_y, {
     <button type="submit" name="thisyear" value="1" class="c-button c-button--<?php echo isset($_REQUEST['thisyear']) ? 'info' : 'brand'; ?>">Tämä vuosi</button>
 </form>
     <?php
+    }
+
+    private function handleArticles($str) {
+        list($first,$rest) = explode(" ", $str . " " , 2);
+        $validarticles = array("a", "an", "the");
+        if (in_array(strtolower($first), $validarticles)) {
+            return $rest . ", " . $first;
+        }
+        return $str;
+    }
+
+    private function articleSort($a, $b) {
+        return strnatcasecmp($this->handleArticles($a), $this->handleArticles($b));
     }
 }
