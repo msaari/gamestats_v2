@@ -1,4 +1,6 @@
 <?php
+session_start();
+$_SESSION = array();
 
 define( "NONCE_LIMIT", 60 * 15 );
 

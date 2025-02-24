@@ -271,7 +271,7 @@ class UI {
     <link rel="stylesheet" href="https://unpkg.com/@blaze/css@x.x.x/dist/blaze/blaze.css">
     <script type="module" src="https://unpkg.com/@blaze/atoms@x.x.x/dist/blaze-atoms/blaze-atoms.esm.js"></script>
     <script nomodule="" src="https://unpkg.com/@blaze/atoms@x.x.x/dist/blaze-atoms/blaze-atoms.js"></script>
-
+    <meta name=viewport content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
 
 <?php if (isset($_REQUEST['tab']) && $_REQUEST['tab'] === 'plays') : ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
